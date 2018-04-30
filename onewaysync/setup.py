@@ -47,7 +47,7 @@ def read(fname):
 
 setup(
     name='onewaysync',
-    version="0.1.0",
+    version="1.0.0",
     description='Python script that will generate incremental tar.gz update files for a remote repository',
     long_description=read("README.rst"),
     author='Gino Lisignoli',
