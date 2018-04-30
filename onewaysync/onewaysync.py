@@ -23,10 +23,20 @@ import sys
 import hashlib
 import json
 import glob
+import tarfile
+import re
 
 __version__ = "0.1.0"
 __author__ = "Gino Lisignoli"
 __license__ = "MIT"
+
+
+def tarfiles(listoffiles, destination, snapshot_number):
+    tar = tarfile.open(destination + '/snapshot_' + str(snapshot_number) +
+                       '.tar.gz', 'w|gz')
+    for name in listoffiles:
+        tar.add(name)
+    tar.close()
 
 
 def md5sum(path):
@@ -70,6 +80,7 @@ def main():
     input_dir = args['INPUT_DIRECTORY']
     listfiles_dir = args['LIST_DIRECTORY']
     output_dir = args['OUTPUT_DIRECTORY']
+    snapshot_number = 0
 
     listfiles = []
 
@@ -94,7 +105,10 @@ def main():
         initial_list = generate_list(input_dir)
         with open(listfiles_dir + '/initial.json', 'w') as outfile:
             json.dump(initial_list, outfile)
-        #TODO Because the initial listing doesn't exist, generate tar and exit
+        # Because the initial listing doesn't exist, generate tar and exit
+        print('Creating initial tar file')
+        tarfiles(initial_list, output_dir, snapshot_number)
+        sys.exit()
 
     # Check if initial.json is a file
     if not(os.path.isfile(listfiles_dir + '/initial.json')):
@@ -108,7 +122,14 @@ def main():
     if listfiles:
         # If exist then generate load initial as last snapshot listing
         listfiles.sort()
-        #TODO Load last SNAPSHOT JSON FILE
+
+        # listfiles are named as snapshot_1.json, snapshot_2.json etc...
+        # Load last snapshot json file
+        snapshot = json.load(open(listfiles[-1]))
+
+        # Update snapshot number to latest +1
+        snapshot_number = int(re.findall(r'\d+', listfiles[-1])[0]) + 1
+
     else:
         # Use inremental listing and generate directory snapshot listing
         # load initial.json
@@ -126,17 +147,36 @@ def main():
         snapshot, current_dir, syntax='explicit', dump=True))
 
     if not snapshot_diff:
-    # If no diff then exit
+        # If no diff then exit
         print('No difference found, exiting')
         sys.exit()
     else:
         tarlist = generate_tar_list(snapshot_diff)
         print('Making tar of files')
-        #TODO Write tarlist to temp file
-        #TODO Create TAR
-        print('List of files to be deleted')
-        for i in snapshot_diff['$delete']:
-            print(i)
+
+        # Create TAR
+        tarfiles(tarlist, output_dir, snapshot_number)
+
+        if '$delete' in snapshot_diff:
+            print('List of files to be deleted')
+            for i in snapshot_diff['$delete']:
+                print(i)
+
+        if '$insert' in snapshot_diff:
+            print('List of files to be added')
+            for i in snapshot_diff['$insert']:
+                print(i)
+
+        if '$update' in snapshot_diff:
+            print('List of files modified')
+            for i in snapshot_diff['$update']:
+                print(i)
+
+        # Write snapshot state to list
+        with open(listfiles_dir + '/snapshot_' + str(snapshot_number) +
+                  '.json', 'w') as outfile:
+            json.dump(current_dir, outfile)
+
 
 if __name__ == '__main__':
     main()
